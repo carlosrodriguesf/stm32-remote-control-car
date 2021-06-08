@@ -4,29 +4,81 @@
 
 Gamepad gamepad(&Serial2);
 
-int pinA = PB8;
-int pinB = PB9;
-int TX = PA3;
-int RX = PA2;
+int ledPinArrowRight = PB8;
+int ledPinArrowLeft = PB9;
 
-auto led_breathe = JLed(pinA).Breathe(1000).Repeat(6).DelayAfter(100).Forever();
-int incomingByte;
+auto jledArrowRight = JLed(ledPinArrowRight).Breathe(1000).Repeat(6).DelayAfter(100).Stop();
+auto jledArrowLeft = JLed(ledPinArrowLeft).Breathe(1000).Repeat(6).DelayAfter(100).Stop();
+
+typedef struct {
+    bool arrowRight;
+    bool arrowLeft;
+    bool alert;
+} State;
+
+State state;
 
 void setup() {
     Serial.begin(115200);
     Serial2.begin(9600);
 
-    pinMode(pinB, OUTPUT);
-    pinMode(pinA, OUTPUT);
+    pinMode(ledPinArrowLeft, OUTPUT);
+    pinMode(ledPinArrowRight, OUTPUT);
+
+    state.arrowRight = false;
+    state.arrowLeft = false;
+    state.alert = false;
+
+    pinMode(LED_BUILTIN, OUTPUT);
+    digitalWrite(LED_BUILDIN, HIGH);
+
+    Serial.println("System started");
 }
 
 void loop() {
-    led_breathe.Update();
-
+    jledArrowLeft.Update();
+    jledArrowRight.Update();
     if (!gamepad.update()) {
-      return;
+        return;
     }
 
+    updateState();
+
+    if (state.arrowLeft) {
+        jledArrowLeft = JLed(ledPinArrowLeft).Breathe(1000).Repeat(6).DelayAfter(100).Forever();
+    } else {
+        jledArrowLeft = JLed(ledPinArrowLeft).Breathe(1000).Repeat(6).DelayAfter(100).Stop();
+    }
+
+    if (state.arrowRight) {
+        jledArrowRight = JLed(ledPinArrowRight).Breathe(1000).Repeat(6).DelayAfter(100).Forever();
+    } else {
+        jledArrowRight = JLed(ledPinArrowRight).Breathe(1000).Repeat(6).DelayAfter(100).Stop();
+    }
+}
+
+void updateState() {
+    if (gamepad.buttonRB) {
+        Serial.println("buttonRB");
+        state.arrowRight = !state.arrowRight;
+        state.arrowLeft = false;
+    }
+    if (gamepad.buttonLB) {
+        Serial.println("buttonLB");
+        state.arrowLeft = !state.arrowLeft;
+        state.arrowRight = false;
+    }
+    if (gamepad.buttonA) {
+        Serial.println("buttonA");
+        state.alert = !state.alert;
+        state.arrowLeft = state.alert;
+        state.arrowRight = state.alert;
+    }
+}
+
+
+///////////////////////////////////////////////////////////////////
+void debug() {
     Serial.println("-----------------------");
     printBoolln("Button A", gamepad.buttonA);
     printBoolln("Button B", gamepad.buttonB);
@@ -41,6 +93,8 @@ void loop() {
     printIntln("Axis RY", gamepad.axisRY);
     printIntln("Axis RX", gamepad.axisRX);
     printIntln("Axis LT", gamepad.axisLT);
+    printIntln("Axis RT", gamepad.axisRT);
+    printIntln("Axis RT", gamepad.axisRT);
     printIntln("Axis RT", gamepad.axisRT);
     delay(500);
 }

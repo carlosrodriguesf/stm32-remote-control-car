@@ -38,10 +38,10 @@ public:
 
     bool update() {
         if (!this->serial->available()) {
-            this->skipCounter ++;
+            this->skipCounter++;
             if (this->skipCounter == 100) {
-              this->clean();
-              this->skipCounter = 0;
+                this->clean();
+                this->skipCounter = 0;
             }
             return false;
         }
@@ -102,9 +102,9 @@ private:
     int skipCounter = 0;
 
     void clean() {
-      while(this->serial->available()){
-        this->serial->read();
-      }
+        while (this->serial->available()) {
+            this->serial->read();
+        }
     }
 
     int getValue() {
