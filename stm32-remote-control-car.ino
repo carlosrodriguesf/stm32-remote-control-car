@@ -14,25 +14,29 @@ typedef struct {
     bool arrowRight;
     bool arrowLeft;
     bool alert;
+    int headlight; // 0 - none | 1 - low beam | 2 - high beam
 } State;
 
 State state;
+
+bool setuprun = false;
 
 void setup() {
     Serial.begin(115200);
     Serial2.begin(9600);
 
+    gamepad.setDebugEnabled(true);
+
     pinMode(ledPinArrowLeft, OUTPUT);
     pinMode(ledPinArrowRight, OUTPUT);
+    pinMode(LED_BUILTIN, OUTPUT);
 
+    digitalWrite(LED_BUILTIN, HIGH);
     state.arrowRight = false;
     state.arrowLeft = false;
     state.alert = false;
 
-    pinMode(LED_BUILTIN, OUTPUT);
-    digitalWrite(LED_BUILDIN, HIGH);
-
-    Serial.println("System started");
+    setuprun = true;
 }
 
 void loop() {
@@ -58,45 +62,56 @@ void loop() {
 }
 
 void updateState() {
-    if (gamepad.buttonRB) {
-        Serial.println("buttonRB");
+    GamepadConfig current = gamepad.current();
+
+    if (!state.alert && current.buttonRB) {
         state.arrowRight = !state.arrowRight;
         state.arrowLeft = false;
     }
-    if (gamepad.buttonLB) {
-        Serial.println("buttonLB");
+    if (!state.alert && current.buttonLB) {
         state.arrowLeft = !state.arrowLeft;
         state.arrowRight = false;
     }
-    if (gamepad.buttonA) {
-        Serial.println("buttonA");
+    if (current.buttonY) {
         state.alert = !state.alert;
         state.arrowLeft = state.alert;
         state.arrowRight = state.alert;
+    }
+    if (current.buttonA) {
+        state.headlight += 1;
+        if (state.headlight >= 2) {
+            state.headlight = 0;
+        }
     }
 }
 
 
 ///////////////////////////////////////////////////////////////////
 void debug() {
-    Serial.println("-----------------------");
-    printBoolln("Button A", gamepad.buttonA);
-    printBoolln("Button B", gamepad.buttonB);
-    printBoolln("Button Y", gamepad.buttonY);
-    printBoolln("Button X", gamepad.buttonX);
-    printBoolln("Button RB", gamepad.buttonRB);
-    printBoolln("Button LB", gamepad.buttonLB);
-    printBoolln("Button thumb R", gamepad.buttonThumbR);
-    printBoolln("Button thumb L", gamepad.buttonThumbL);
-    printIntln("Axis LY", gamepad.axisLY);
-    printIntln("Axis LX", gamepad.axisLX);
-    printIntln("Axis RY", gamepad.axisRY);
-    printIntln("Axis RX", gamepad.axisRX);
-    printIntln("Axis LT", gamepad.axisLT);
-    printIntln("Axis RT", gamepad.axisRT);
-    printIntln("Axis RT", gamepad.axisRT);
-    printIntln("Axis RT", gamepad.axisRT);
+    Serial.println("CURRENT -----------------------");
+    debugConfig(gamepad.current());
+    Serial.println("PREVIOUS ----------------------");
+    debugConfig(gamepad.previous());
     delay(500);
+}
+
+void debugConfig(GamepadConfig config) {
+    printBoolln("Button A", config.buttonA);
+    printBoolln("Button B", config.buttonB);
+    printBoolln("Button Y", config.buttonY);
+    printBoolln("Button X", config.buttonX);
+    printBoolln("Button RB", config.buttonRB);
+    printBoolln("Button LB", config.buttonLB);
+    printBoolln("Button thumb R", config.buttonThumbR);
+    printBoolln("Button thumb L", config.buttonThumbL);
+    printIntln("Axis LY", config.axisLY);
+    printIntln("Axis LX", config.axisLX);
+    printIntln("Axis RY", config.axisRY);
+    printIntln("Axis RX", config.axisRX);
+    printIntln("Axis LT", config.axisLT);
+    printIntln("Axis RT", config.axisRT);
+    printIntln("Axis RT", config.axisRT);
+    printIntln("Axis RT", config.axisRT);
 }
 
 void printIntln(String name, int value) {

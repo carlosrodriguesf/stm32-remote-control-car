@@ -15,8 +15,7 @@ const int AXIS_RX = 12;
 const int AXIS_LT = 13;
 const int AXIS_RT = 14;
 
-class Gamepad {
-public:
+typedef struct GamepadConfig {
     bool buttonA;
     bool buttonB;
     bool buttonY;
@@ -31,9 +30,27 @@ public:
     int axisRX;
     int axisLT;
     int axisRT;
+};
 
+class Gamepad {
+public:
     Gamepad(HardwareSerial *serial) {
         this->serial = serial;
+        this->skipCounter = 0;
+
+        GamepadConfig init;
+    }
+
+    GamepadConfig current() {
+        return this->currentConfiguration;
+    }
+
+    GamepadConfig previous() {
+        return this->previousConfiguration;
+    }
+
+    void setDebugEnabled(bool enabled) {
+        this->debugEnabled = enabled;
     }
 
     bool update() {
@@ -46,60 +63,77 @@ public:
             return false;
         }
 
-        int head = this->getHead();
+        int button = this->getHead();
         int value = this->getValue();
 
-        switch (head) {
-            case BUTTON_A:
-                this->buttonA = value == 1;
-                break;
-            case BUTTON_B:
-                this->buttonB = value == 1;
-                break;
-            case BUTTON_Y:
-                this->buttonY = value == 1;
-                break;
-            case BUTTON_X:
-                this->buttonX = value == 1;
-                break;
-            case BUTTON_RB:
-                this->buttonRB = value == 1;
-                break;
-            case BUTTON_LB:
-                this->buttonLB = value == 1;
-                break;
-            case BUTTON_THUMB_L:
-                this->buttonThumbL = value == 1;
-                break;
-            case BUTTON_THUMB_R:
-                this->buttonThumbR = value == 1;
-                break;
-            case AXIS_LY:
-                this->axisLY = value;
-                break;
-            case AXIS_LX:
-                this->axisLX = value;
-                break;
-            case AXIS_RY:
-                this->axisRY = value;
-                break;
-            case AXIS_RX:
-                this->axisRX = value;
-                break;
-            case AXIS_LT:
-                this->axisLT = value;
-                break;
-            case AXIS_RT:
-                this->axisRT = value;
-                break;
+        if (this->debugEnabled) {
+            Serial.print("NEW EVENT : ");
+            Serial.print(button);
+            Serial.print(" : ");
+            Serial.println(value);
         }
 
+        this->updateConfig(button, value);
         return true;
     }
 
 private:
     HardwareSerial *serial;
-    int skipCounter = 0;
+    int skipCounter;
+    bool debugEnabled;
+    GamepadConfig currentConfiguration;
+    GamepadConfig previousConfiguration;
+
+    void updateConfig(int button, int value) {
+        this->previousConfiguration = this->currentConfiguration;
+
+        GamepadConfig *config = &this->currentConfiguration;
+
+        switch (button) {
+            case BUTTON_A:
+                config->buttonA = value == 1;
+                break;
+            case BUTTON_B:
+                config->buttonB = value == 1;
+                break;
+            case BUTTON_Y:
+                config->buttonY = value == 1;
+                break;
+            case BUTTON_X:
+                config->buttonX = value == 1;
+                break;
+            case BUTTON_RB:
+                config->buttonRB = value == 1;
+                break;
+            case BUTTON_LB:
+                config->buttonLB = value == 1;
+                break;
+            case BUTTON_THUMB_L:
+                config->buttonThumbL = value == 1;
+                break;
+            case BUTTON_THUMB_R:
+                config->buttonThumbR = value == 1;
+                break;
+            case AXIS_LY:
+                config->axisLY = value;
+                break;
+            case AXIS_LX:
+                config->axisLX = value;
+                break;
+            case AXIS_RY:
+                config->axisRY = value;
+                break;
+            case AXIS_RX:
+                config->axisRX = value;
+                break;
+            case AXIS_LT:
+                config->axisLT = value;
+                break;
+            case AXIS_RT:
+                config->axisRT = value;
+                break;
+        }
+    }
 
     void clean() {
         while (this->serial->available()) {
