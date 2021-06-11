@@ -1,25 +1,28 @@
 #include <Arduino.h>
 #include <jled.h>
+#include <Servo.h>
 #include "gamepad.cpp"
 
 Gamepad gamepad(&Serial2);
 
-int ledPinArrowRight = PB8;
-int ledPinArrowLeft = PB9;
+const int pinLedArrowRight = PB8;
+const int pinLedArrowLeft = PB9;
+const int pinLedHeadlight = PB7;
+const int pinServoDirection = PB6;
 
-auto jledArrowRight = JLed(ledPinArrowRight).Breathe(1000).Repeat(6).DelayAfter(100).Stop();
-auto jledArrowLeft = JLed(ledPinArrowLeft).Breathe(1000).Repeat(6).DelayAfter(100).Stop();
+auto jledArrowRight = JLed(pinLedArrowRight).Breathe(1000).Repeat(6).DelayAfter(100).Stop();
+auto jledArrowLeft = JLed(pinLedArrowLeft).Breathe(1000).Repeat(6).DelayAfter(100).Stop();
+Servo servoDirection;
 
 typedef struct {
     bool arrowRight;
     bool arrowLeft;
     bool alert;
     int headlight; // 0 - none | 1 - low beam | 2 - high beam
+    int direction;
 } State;
 
 State state;
-
-bool setuprun = false;
 
 void setup() {
     Serial.begin(115200);
@@ -27,16 +30,25 @@ void setup() {
 
     gamepad.setDebugEnabled(true);
 
-    pinMode(ledPinArrowLeft, OUTPUT);
-    pinMode(ledPinArrowRight, OUTPUT);
-    pinMode(LED_BUILTIN, OUTPUT);
+    pinMode(pinLedArrowLeft, OUTPUT);
+    pinMode(pinLedArrowRight, OUTPUT);
+    pinMode(pinLedHeadlight, PWM);
 
-    digitalWrite(LED_BUILTIN, HIGH);
+    servoDirection.attach(pinServoDirection);
+
+    digitalWrite(pinLedArrowLeft, LOW);
+    digitalWrite(pinLedArrowRight, LOW);
+    digitalWrite(pinLedHeadlight, LOW);
+
     state.arrowRight = false;
     state.arrowLeft = false;
     state.alert = false;
+    state.headlight = 0;
+    state.direction = 90;
 
-    setuprun = true;
+    syncState();
+
+    pinMode(LED_BUILTIN, OUTPUT);
 }
 
 void loop() {
@@ -47,18 +59,26 @@ void loop() {
     }
 
     updateState();
+    syncState();
+}
 
+void syncState() {
     if (state.arrowLeft) {
-        jledArrowLeft = JLed(ledPinArrowLeft).Breathe(1000).Repeat(6).DelayAfter(100).Forever();
+        jledArrowLeft = JLed(pinLedArrowLeft).Breathe(1000).Repeat(6).DelayAfter(100).Forever();
     } else {
-        jledArrowLeft = JLed(ledPinArrowLeft).Breathe(1000).Repeat(6).DelayAfter(100).Stop();
+        jledArrowLeft = JLed(pinLedArrowLeft).Breathe(1000).Repeat(6).DelayAfter(100).Stop();
     }
 
     if (state.arrowRight) {
-        jledArrowRight = JLed(ledPinArrowRight).Breathe(1000).Repeat(6).DelayAfter(100).Forever();
+        jledArrowRight = JLed(pinLedArrowRight).Breathe(1000).Repeat(6).DelayAfter(100).Forever();
     } else {
-        jledArrowRight = JLed(ledPinArrowRight).Breathe(1000).Repeat(6).DelayAfter(100).Stop();
+        jledArrowRight = JLed(pinLedArrowRight).Breathe(1000).Repeat(6).DelayAfter(100).Stop();
     }
+
+    pwmWrite(pinLedHeadlight, map(state.headlight, 0, 2, 0, 65535));
+    servoDirection.write(state.direction);
+
+    Serial.println(state.direction);
 }
 
 void updateState() {
@@ -79,10 +99,12 @@ void updateState() {
     }
     if (current.buttonA) {
         state.headlight += 1;
-        if (state.headlight >= 2) {
+        if (state.headlight > 2) {
             state.headlight = 0;
         }
     }
+
+    state.direction = map(current.axisLX, -100, 100, 0, 180);
 }
 
 

@@ -15,7 +15,12 @@ const int AXIS_RX = 12;
 const int AXIS_LT = 13;
 const int AXIS_RT = 14;
 
-typedef struct GamepadConfig {
+typedef struct {
+    int key;
+    int value;
+} Command;
+
+typedef struct {
     bool buttonA;
     bool buttonB;
     bool buttonY;
@@ -30,7 +35,7 @@ typedef struct GamepadConfig {
     int axisRX;
     int axisLT;
     int axisRT;
-};
+} GamepadConfig;
 
 class Gamepad {
 public:
@@ -63,17 +68,17 @@ public:
             return false;
         }
 
-        int button = this->getHead();
-        int value = this->getValue();
+        Command command = this->readCommand();
 
         if (this->debugEnabled) {
-            Serial.print("NEW EVENT : ");
-            Serial.print(button);
+            Serial.print("COMMAND : ");
+            Serial.print(command.key);
             Serial.print(" : ");
-            Serial.println(value);
+            Serial.print(command.value);
+            Serial.println(";");
         }
 
-        this->updateConfig(button, value);
+        this->updateConfig(command.key, command.value);
         return true;
     }
 
@@ -164,5 +169,23 @@ private:
             index++;
         } while (index < size);
         return content.toInt();
+    }
+
+    Command readCommand() {
+        String content;
+        do {
+            if (!this->serial->available()) {
+                continue;
+            }
+            content.concat((char) this->serial->read());
+        } while (!content.endsWith(";"));
+
+        Command command;
+        command.key = content.substring(0, 2).toInt();
+        command.value = content.substring(2, 5).toInt();
+        if (content.charAt(5) == '0') {
+            command.value = command.value *= -1;
+        }
+        return command;
     }
 };
