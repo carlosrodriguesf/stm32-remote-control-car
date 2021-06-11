@@ -146,40 +146,8 @@ private:
         }
     }
 
-    int getValue() {
-        int value = this->readInt(3);
-        if (this->readInt(1) == 0) {
-            value *= -1;
-        }
-        return value;
-    }
-
-    int getHead() {
-        return this->readInt(2);
-    }
-
-    int readInt(int size) {
-        String content;
-        int index = 0;
-        do {
-            if (!this->serial->available()) {
-                continue;
-            }
-            content.concat((char) this->serial->read());
-            index++;
-        } while (index < size);
-        return content.toInt();
-    }
-
     Command readCommand() {
-        String content;
-        do {
-            if (!this->serial->available()) {
-                continue;
-            }
-            content.concat((char) this->serial->read());
-        } while (!content.endsWith(";"));
-
+        String content = readCommandString();
         Command command;
         command.key = content.substring(0, 2).toInt();
         command.value = content.substring(2, 5).toInt();
@@ -187,5 +155,16 @@ private:
             command.value = command.value *= -1;
         }
         return command;
+    }
+
+    String readCommandString() {
+        String content;
+        do {
+            if (!serial->available()) {
+                continue;
+            }
+            content.concat((char) this->serial->read());
+        } while (!content.endsWith(";"));
+        return content;
     }
 };
