@@ -3,12 +3,19 @@
 #include <Servo.h>
 #include "gamepad.cpp"
 
+const int DIRECTION_NONE = 0;
+const int DIRECTION_FRONT = 1;
+const int DIRECTION_BACK = 2;
+
 Gamepad gamepad(&Serial2);
 
 const int pinLedArrowRight = PB8;
 const int pinLedArrowLeft = PB9;
 const int pinLedHeadlight = PB7;
 const int pinServoDirection = PB6;
+const int pinMotorPower = PA8;
+const int pinMotorInput1 = PB15;
+const int pinMotorInput2 = PB14;
 
 auto jledArrowRight = JLed(pinLedArrowRight).Breathe(1000).Repeat(6).DelayAfter(100).Stop();
 auto jledArrowLeft = JLed(pinLedArrowLeft).Breathe(1000).Repeat(6).DelayAfter(100).Stop();
@@ -18,35 +25,45 @@ typedef struct {
     bool arrowRight;
     bool arrowLeft;
     bool alert;
-    int headlight; // 0 - none | 1 - low beam | 2 - high beam
-    int direction;
+
+    bool headlightOn; // 0 - none | 1 - low beam | 2 - high beam
+    bool highBeam;
+
+    int headlight;
+    int axisDirection;
+    int motorDirection; // 0 - none | 1 - front | 2 - back
+    int motorPower;
 } State;
 
 State state;
+State prevState;
 
 void setup() {
     Serial.begin(115200);
-    Serial2.begin(9600);
+    Serial2.begin(115200);
 
     gamepad.setDebugEnabled(true);
 
     pinMode(pinLedArrowLeft, OUTPUT);
     pinMode(pinLedArrowRight, OUTPUT);
     pinMode(pinLedHeadlight, PWM);
+    pinMode(pinMotorPower, PWM);
+    pinMode(pinMotorInput1, OUTPUT);
+    pinMode(pinMotorInput2, OUTPUT);
 
     servoDirection.attach(pinServoDirection);
-
-    digitalWrite(pinLedArrowLeft, LOW);
-    digitalWrite(pinLedArrowRight, LOW);
-    digitalWrite(pinLedHeadlight, LOW);
 
     state.arrowRight = false;
     state.arrowLeft = false;
     state.alert = false;
+    state.headlightOn = false;
+    state.highBeam = false;
     state.headlight = 0;
-    state.direction = 90;
+    state.axisDirection = 90;
+    state.motorDirection = 0;
+    state.motorPower = 0;
 
-    syncState();
+    applyState();
 
     pinMode(LED_BUILTIN, OUTPUT);
 }
@@ -58,30 +75,38 @@ void loop() {
         return;
     }
 
-    updateState();
-    syncState();
+    processNewState();
+    applyState();
 }
 
-void syncState() {
-    if (state.arrowLeft) {
-        jledArrowLeft = JLed(pinLedArrowLeft).Breathe(1000).Repeat(6).DelayAfter(100).Forever();
-    } else {
-        jledArrowLeft = JLed(pinLedArrowLeft).Breathe(1000).Repeat(6).DelayAfter(100).Stop();
+void applyState() {
+    if (prevState.arrowLeft != state.arrowLeft) {
+        if (state.arrowLeft) {
+            jledArrowLeft = JLed(pinLedArrowLeft).Breathe(1000).DelayAfter(100).Forever();
+        } else {
+            jledArrowLeft = JLed(pinLedArrowLeft).Breathe(1000).DelayAfter(100).Stop();
+        }
     }
 
-    if (state.arrowRight) {
-        jledArrowRight = JLed(pinLedArrowRight).Breathe(1000).Repeat(6).DelayAfter(100).Forever();
-    } else {
-        jledArrowRight = JLed(pinLedArrowRight).Breathe(1000).Repeat(6).DelayAfter(100).Stop();
+    if (prevState.arrowRight != state.arrowRight) {
+        if (state.arrowRight) {
+            jledArrowRight = JLed(pinLedArrowRight).Breathe(1000).DelayAfter(100).Forever();
+        } else {
+            jledArrowRight = JLed(pinLedArrowRight).Breathe(1000).DelayAfter(100).Stop();
+        }
     }
 
     pwmWrite(pinLedHeadlight, map(state.headlight, 0, 2, 0, 65535));
-    servoDirection.write(state.direction);
+    servoDirection.write(state.axisDirection);
 
-    Serial.println(state.direction);
+    digitalWrite(pinMotorInput1, state.motorDirection == DIRECTION_FRONT && state.motorDirection != DIRECTION_NONE);
+    digitalWrite(pinMotorInput2, state.motorDirection == DIRECTION_BACK && state.motorDirection != DIRECTION_NONE);
+    pwmWrite(pinMotorPower, map(state.motorPower, 0, 1000, 0, 65535));
 }
 
-void updateState() {
+void processNewState() {
+    prevState = state;
+
     GamepadConfig current = gamepad.current();
 
     if (!state.alert && current.buttonRB) {
@@ -98,60 +123,33 @@ void updateState() {
         state.arrowRight = state.alert;
     }
     if (current.buttonA) {
-        state.headlight += 1;
-        if (state.headlight > 2) {
-            state.headlight = 0;
-        }
+        state.headlightOn = !state.headlightOn;
     }
-
-    state.direction = map(current.axisLX, -100, 100, 0, 180);
-}
-
-
-///////////////////////////////////////////////////////////////////
-void debug() {
-    Serial.println("CURRENT -----------------------");
-    debugConfig(gamepad.current());
-    Serial.println("PREVIOUS ----------------------");
-    debugConfig(gamepad.previous());
-    delay(500);
-}
-
-void debugConfig(GamepadConfig config) {
-    printBoolln("Button A", config.buttonA);
-    printBoolln("Button B", config.buttonB);
-    printBoolln("Button Y", config.buttonY);
-    printBoolln("Button X", config.buttonX);
-    printBoolln("Button RB", config.buttonRB);
-    printBoolln("Button LB", config.buttonLB);
-    printBoolln("Button thumb R", config.buttonThumbR);
-    printBoolln("Button thumb L", config.buttonThumbL);
-    printIntln("Axis LY", config.axisLY);
-    printIntln("Axis LX", config.axisLX);
-    printIntln("Axis RY", config.axisRY);
-    printIntln("Axis RX", config.axisRX);
-    printIntln("Axis LT", config.axisLT);
-    printIntln("Axis RT", config.axisRT);
-    printIntln("Axis RT", config.axisRT);
-    printIntln("Axis RT", config.axisRT);
-}
-
-void printIntln(String name, int value) {
-    String s;
-    s.concat(value);
-    println(name, s);
-}
-
-void printBoolln(String name, bool value) {
-    if (value) {
-        println(name, "true");
+    if (current.buttonB) {
+        state.highBeam = !state.highBeam;
+    }
+    if (state.headlightOn) {
+        state.headlight = ((int)state.headlightOn) + ((int)state.highBeam);
     } else {
-        println(name, "false");
+        state.headlight = 0;
     }
-}
 
-void println(String name, String value) {
-    Serial.print(name);
-    Serial.print(" : ");
-    Serial.println(value);
+    Serial.println(state.headlight);
+
+    state.axisDirection = map(current.axisLX, -100, 100, 0, 180);
+
+    int axisLT = map(current.axisLT, 0, 100, 0, 1000);
+    int axisRT = map(current.axisRT, 0, 100, 0, 1000);
+    state.motorPower = axisLT - axisRT;
+    if (state.motorPower > 0) {
+        state.motorDirection = DIRECTION_FRONT;
+    } else if (state.motorPower < 0) {
+        state.motorDirection = DIRECTION_BACK;
+        state.motorPower *= -1;
+    } else {
+        state.motorDirection = DIRECTION_NONE;
+    }
+    if (state.motorPower < 10) {
+        state.motorPower = 0;
+    }
 }

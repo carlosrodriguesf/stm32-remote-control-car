@@ -41,9 +41,6 @@ class Gamepad {
 public:
     Gamepad(HardwareSerial *serial) {
         this->serial = serial;
-        this->skipCounter = 0;
-
-        GamepadConfig init;
     }
 
     GamepadConfig current() {
@@ -59,12 +56,7 @@ public:
     }
 
     bool update() {
-        if (!this->serial->available()) {
-            this->skipCounter++;
-            if (this->skipCounter == 100) {
-                this->clean();
-                this->skipCounter = 0;
-            }
+        if (!serial->available()) {
             return false;
         }
 
@@ -78,21 +70,20 @@ public:
             Serial.println(";");
         }
 
-        this->updateConfig(command.key, command.value);
+        updateConfig(command.key, command.value);
         return true;
     }
 
 private:
-    HardwareSerial *serial;
-    int skipCounter;
     bool debugEnabled;
+    HardwareSerial *serial;
     GamepadConfig currentConfiguration;
     GamepadConfig previousConfiguration;
 
     void updateConfig(int button, int value) {
         this->previousConfiguration = this->currentConfiguration;
 
-        GamepadConfig *config = &this->currentConfiguration;
+        GamepadConfig *config = &currentConfiguration;
 
         switch (button) {
             case BUTTON_A:
@@ -137,12 +128,6 @@ private:
             case AXIS_RT:
                 config->axisRT = value;
                 break;
-        }
-    }
-
-    void clean() {
-        while (this->serial->available()) {
-            this->serial->read();
         }
     }
 
